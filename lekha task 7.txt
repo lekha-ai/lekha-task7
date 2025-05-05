@@ -1,0 +1,85 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+from matplotlib.colors import ListedColormap
+
+data = pd.read_csv(r"C:\Users\lekha\Downloads\breast-cancer.xls")
+
+
+data['diagnosis'] = data['diagnosis'].map({'M': 1, 'B': 0})
+
+selected_features = ['radius_mean', 'texture_mean']
+X = data[selected_features].values
+y = data['diagnosis'].values
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42
+)
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+def plot_boundary(classifier, X, y, title):
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.linspace(x_min, x_max, 500),
+                         np.linspace(y_min, y_max, 500))
+    
+    Z = classifier.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+
+    cmap = ListedColormap(['purple', 'yellow'])
+
+    plt.figure(figsize=(8, 6))
+    plt.contourf(xx, yy, Z, alpha=0.3, cmap=cmap)
+    plt.scatter(X[:, 0], X[:, 1], c=y, edgecolors='k', cmap=cmap)
+    plt.title(title)
+    plt.xlabel(selected_features[0])
+    plt.ylabel(selected_features[1])
+    plt.tight_layout()
+    plt.show()
+
+linear_model = SVC(kernel='linear', C=1)
+linear_model.fit(X_train, y_train)
+
+
+plot_boundary(linear_model, X_train, y_train, "Linear SVM Decision Boundary")
+
+
+rbf_model = SVC(kernel='rbf', C=1, gamma=0.5)
+rbf_model.fit(X_train, y_train)
+
+plot_boundary(rbf_model, X_train, y_train, "RBF SVM Decision Boundary")
+
+
+linear_acc = accuracy_score(y_test, linear_model.predict(X_test))
+rbf_acc = accuracy_score(y_test, rbf_model.predict(X_test))
+
+print("Test Accuracy (Linear SVM):", linear_acc)
+print("Test Accuracy (RBF SVM):", rbf_acc)
+
+param_grid = {
+    'C': [0.1, 1, 10, 100],
+    'gamma': [0.01, 0.1, 0.5, 1],
+    'kernel': ['rbf']
+}
+
+grid_search = GridSearchCV(SVC(), param_grid, cv=5)
+grid_search.fit(X_train, y_train)
+
+
+print("Optimal Parameters:", grid_search.best_params_)
+print("Best Cross-Validation Score:", grid_search.best_score_)
+
+best_svm = grid_search.best_estimator_
+cv_scores = cross_val_score(best_svm, X, y, cv=5)
+
+print("Cross-Validation Scores:", cv_scores)
+print("Average CV Accuracy:", cv_scores.mean())
+
+plot_boundary(best_svm, X_train, y_train, "Optimized SVM Decision Boundary")
